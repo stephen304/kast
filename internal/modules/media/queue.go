@@ -1,7 +1,6 @@
 package media
 
 import (
-	"fmt"
 	"log"
 	"sync"
 )
@@ -26,10 +25,6 @@ func (q *queue) enqueue(media string) {
 	} else {
 		q.nextItems = append(q.nextItems, media)
 	}
-	fmt.Println("Enqueue")
-	fmt.Printf("%+v\n", q.prevItems)
-	fmt.Printf("%+v\n", q.playHead)
-	fmt.Printf("%+v\n", q.nextItems)
 }
 
 func (q *queue) Get() string {
@@ -56,10 +51,6 @@ func (q *queue) Prev() string {
 	} else {
 		log.Print("Nothing to reqind to")
 	}
-	fmt.Println("Prev")
-	fmt.Printf("%+v\n", q.prevItems)
-	fmt.Printf("%+v\n", q.playHead)
-	fmt.Printf("%+v\n", q.nextItems)
 	return q.playHead
 }
 
@@ -81,10 +72,6 @@ func (q *queue) Next() string {
 			q.nextItems = nil
 		}
 	}
-	fmt.Println("Next")
-	fmt.Printf("%+v\n", q.prevItems)
-	fmt.Printf("%+v\n", q.playHead)
-	fmt.Printf("%+v\n", q.nextItems)
 	return q.playHead
 }
 

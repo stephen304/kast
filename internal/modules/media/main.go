@@ -7,21 +7,23 @@ import (
 	"os"
 	"os/exec"
 	"sync"
-	"time"
 )
 
 const NAME = "MEDIA"
 
 type Media struct {
-	queue *queue
-	c1    *exec.Cmd
-	c2    *exec.Cmd
-	m     sync.Mutex
+	queue   *queue
+	c1      *exec.Cmd
+	c2      *exec.Cmd
+	m       sync.Mutex
+	worker       sync.Mutex
+	running bool
 }
 
 func New(r *gin.RouterGroup, display *internal.DisplayMutex) *Media {
 	module := &Media{
-		queue: newQueue(),
+		queue:   newQueue(),
+		running: false,
 	}
 
 	r.POST("/load", func(c *gin.Context) {
@@ -39,13 +41,8 @@ func New(r *gin.RouterGroup, display *internal.DisplayMutex) *Media {
 	// })
 	//
 	r.POST("/prev", func(c *gin.Context) {
-		log.Println("Killing module")
 		module.Kill()
-		log.Println("Executing prev")
 		module.queue.Prev()
-		// TODO: God please help me
-		time.Sleep(2 * time.Second)
-		log.Println("starting")
 		module.Start()
 	})
 
@@ -61,6 +58,9 @@ func (module *Media) GetName() string {
 }
 
 func (module *Media) mediaLoop() {
+	module.worker.Lock()
+	defer module.worker.Unlock()
+
 	for len(module.queue.Get()) > 0 {
 		url := module.queue.Get()
 		log.Printf("[Media] playing: %s", url)
@@ -73,9 +73,9 @@ func (module *Media) mediaLoop() {
 		_ = module.c2.Wait()
 
 		// Process exited
-		// Lock is to keep this thread from running until any kill actions are complete
+		// Lock is to keep this worker from running until any kill actions are complete
 		module.m.Lock()
-		if module.c1 == nil && module.c2 == nil {
+		if module.running == false {
 			// Processes were killed
 			module.m.Unlock()
 			return
@@ -87,28 +87,30 @@ func (module *Media) mediaLoop() {
 }
 
 func (module *Media) Start() error {
+	module.running = true
 	go module.mediaLoop()
 	return nil
 }
 
 func (module *Media) Stop() error {
+	log.Println("[Media] Stopping...")
 	module.queue.Empty()
 	module.Kill()
 	return nil
 }
 
 func (module *Media) Kill() {
-	log.Println("getting lock")
 	module.m.Lock()
-	log.Println("defer unlock")
-	defer module.m.Unlock()
 
 	if module.c1 != nil && module.c1.Process != nil {
 		module.c1.Process.Kill()
 	}
-	module.c1 = nil
 	if module.c2 != nil && module.c2.Process != nil {
 		module.c2.Process.Kill()
 	}
-	module.c2 = nil
+	module.running = false
+	module.m.Unlock()
+	// Ensure all workers have exited
+	module.worker.Lock()
+	module.worker.Unlock()
 }
