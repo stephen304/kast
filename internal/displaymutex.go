@@ -26,14 +26,13 @@ func (mutex *DisplayMutex) Assign(module KastModule) {
 
 	if mutex.module != module {
 		if mutex.module != nil {
+			log.Printf("[%s] Stopping...", mutex.module.GetName())
 			go func(module KastModule) {
-				log.Printf("Stopping module: %s", module.GetName())
 				module.Stop()
 			}(mutex.module)
 		}
-		log.Printf("Loading module: %s", module.GetName())
+		log.Printf("[%s] Starting...", module.GetName())
 		mutex.module = module
-		log.Printf("Starting module: %s", module.GetName())
 		mutex.module.Start()
 	}
 }

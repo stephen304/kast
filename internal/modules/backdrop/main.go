@@ -5,19 +5,24 @@ import (
 	"github.com/stephen304/kast/internal"
 	// "math/rand"
 	"os/exec"
-	"regexp"
+	// "regexp"
 	// "strings"
 	"sync"
 	// "time"
-	"fmt"
+	"context"
+	// "fmt"
+	"github.com/chromedp/chromedp"
 	"log"
 )
 
 const NAME = "BACKDROP"
 
 type Backdrop struct {
-	m   sync.Mutex
-	cmd *exec.Cmd
+	m              sync.Mutex
+	cmd            *exec.Cmd
+	allocCtxCancel context.CancelFunc
+	taskCtx        context.Context
+	taskCtxCancel  context.CancelFunc
 }
 
 func New(r *gin.RouterGroup, display *internal.DisplayMutex) *Backdrop {
@@ -26,24 +31,32 @@ func New(r *gin.RouterGroup, display *internal.DisplayMutex) *Backdrop {
 	display.Assign(module)
 
 	r.POST("/start", func(c *gin.Context) {
-		// url := c.PostForm("url")
-		// module.queue.enqueue(url)
 		display.Assign(module)
-		module.m.Lock()
-		if module.cmd == nil {
-			module.Start()
-		}
-		module.m.Unlock()
+		module.Start()
 	})
 
 	r.POST("/stop", func(c *gin.Context) {
-		// url := c.PostForm("url")
-		// module.queue.enqueue(url)
+		module.Stop()
+	})
+
+	r.POST("/prev", func(c *gin.Context) {
 		module.m.Lock()
-		if module.cmd != nil {
-			module.Stop()
+		defer module.m.Unlock()
+		if module.taskCtx != nil {
+			chromedp.Run(module.taskCtx,
+				chromedp.Click(`body > div.pagination a.pagination__link.pagination__link--prev`, chromedp.NodeVisible),
+			)
 		}
-		module.m.Unlock()
+	})
+
+	r.POST("/next", func(c *gin.Context) {
+		module.m.Lock()
+		defer module.m.Unlock()
+		if module.taskCtx != nil {
+			chromedp.Run(module.taskCtx,
+				chromedp.Click(`body > div.pagination a.pagination__link.pagination__link--next`, chromedp.NodeVisible),
+			)
+		}
 	})
 
 	return module
@@ -54,50 +67,80 @@ func (module *Backdrop) GetName() string {
 }
 
 func (module *Backdrop) Start() error {
-	if module.cmd != nil {
+	module.m.Lock()
+	defer module.m.Unlock()
+
+	if module.taskCtx != nil {
 		return nil
 	}
-	backgroundsList, err := exec.Command("curl", "-s", "-o", "-", "https://raw.githubusercontent.com/dconnolly/chromecast-backgrounds/master/README.md").Output()
-	if err != nil {
-		module.cmd = nil
-		return err
+
+	opts := []chromedp.ExecAllocatorOption{
+		// From: chromedp.DefaultExecAllocatorOptions[:]
+		chromedp.NoFirstRun,
+		chromedp.NoDefaultBrowserCheck,
+		// chromedp.Headless,
+
+		// After Puppeteer's default behavior.
+		chromedp.Flag("disable-background-networking", true),
+		// chromedp.Flag("enable-features", "NetworkService,NetworkServiceInProcess"),
+		// chromedp.Flag("disable-background-timer-throttling", true),
+		// chromedp.Flag("disable-backgrounding-occluded-windows", true),
+		// chromedp.Flag("disable-breakpad", true),
+		// chromedp.Flag("disable-client-side-phishing-detection", true),
+		chromedp.Flag("disable-default-apps", true),
+		// chromedp.Flag("disable-dev-shm-usage", true),
+		// chromedp.Flag("disable-extensions", true),
+		chromedp.Flag("disable-features", "site-per-process,TranslateUI,BlinkGenPropertyTrees"),
+		// chromedp.Flag("disable-hang-monitor", true),
+		// chromedp.Flag("disable-ipc-flooding-protection", true),
+		// chromedp.Flag("disable-popup-blocking", true),
+		// chromedp.Flag("disable-prompt-on-repost", true),
+		// chromedp.Flag("disable-renderer-backgrounding", true),
+		chromedp.Flag("disable-sync", true),
+		// chromedp.Flag("force-color-profile", "srgb"),
+		// chromedp.Flag("metrics-recording-only", true),
+		// chromedp.Flag("safebrowsing-disable-auto-update", true),
+		// chromedp.Flag("enable-automation", true), // Causes warning to be shown at the top
+		chromedp.Flag("password-store", "basic"),
+		chromedp.Flag("use-mock-keychain", true),
+
+		// No UI is best UI
+		chromedp.Flag("kiosk", true),
+		chromedp.Flag("force-dark-mode", true),
 	}
-	// backgrounds := strings.Split(string(backgroundsList), "\n")
-	backgrounds := string(backgroundsList)
-	// rand.Seed(time.Now().UnixNano())
-	// rand.Shuffle(len(backgrounds), func(i, j int) { backgrounds[i], backgrounds[j] = backgrounds[j], backgrounds[i] })
 
-	re := regexp.MustCompile(`https?://[^)]+`)
-	matches := re.FindAllStringSubmatch(string(backgrounds), -1)
+	// Create chrome process
+	allocCtx, allocCtxCancel := chromedp.NewExecAllocator(context.Background(), opts...)
+	module.allocCtxCancel = allocCtxCancel
+	taskCtx, taskCtxCancel := chromedp.NewContext(allocCtx, chromedp.WithLogf(log.Printf))
+	module.taskCtxCancel = taskCtxCancel
+	module.taskCtx = taskCtx
 
-	var cleanMatches []string
-	for _, x := range matches {
-		cleanMatches = append(cleanMatches, x[0]) // note the = instead of :=
-	}
-	fmt.Printf("%+v\n", cleanMatches)
-	flags := []string{"-F", "-p", "-z"}
-	flags = append(flags, cleanMatches...)
-	// log.Printf("cleanMatches: ", cleanMatches)
-	feh := exec.Command("feh", flags...)
-	// err = feh.Start()
-	output, err := feh.CombinedOutput()
-
-	log.Printf("Output:\n%s", output)
-	if err != nil {
-		module.cmd = nil
-		return err
+	// Start the browser
+	err := chromedp.Run(taskCtx,
+		chromedp.Navigate(`https://earthview.withgoogle.com/`),
+	)
+	if err == nil {
+		// Using a separate thread doesn't seem to help much here for API responsiveness
+		// But at least it seems like it doesn't hurt anything
+		go chromedp.Run(taskCtx,
+			chromedp.WaitVisible(`body > div.intro a.button.intro__explore`),
+			chromedp.Click(`body > div.intro a.button.intro__explore`, chromedp.NodeVisible),
+		)
 	}
 
-	module.cmd = feh
-
-	return nil
+	return err
 }
 
 func (module *Backdrop) Stop() error {
+	module.m.Lock()
+	defer module.m.Unlock()
+
 	var err error = nil
-	if module.cmd != nil {
-		err = module.cmd.Process.Kill() // Immediate
-		module.cmd = nil
+	if module.taskCtx != nil {
+		module.taskCtxCancel()
+		module.allocCtxCancel()
+		module.taskCtx = nil
 	}
 	return err
 }

@@ -26,10 +26,20 @@ func New(r *gin.RouterGroup, display *internal.DisplayMutex) *Media {
 		running: false,
 	}
 
-	r.POST("/load", func(c *gin.Context) {
+	// Adds the url to the end of the queue
+	// Also activates the module and starts the process if not active
+	r.POST("/enqueue", func(c *gin.Context) {
 		url := c.PostForm("url")
 		module.queue.enqueue(url)
 		display.Assign(module)
+	})
+
+	// Immediately plays the selected media followed by nextItems in the queue
+	// Activates the module and starts the process if not active
+	r.POST("/play", func(c *gin.Context) {
+		// url := c.PostForm("url")
+		// module.queue.preempt(url)
+		// display.Assign(module)
 	})
 
 	// r.POST("/pause", func(c *gin.Context) {
@@ -47,7 +57,9 @@ func New(r *gin.RouterGroup, display *internal.DisplayMutex) *Media {
 	})
 
 	r.POST("/next", func(c *gin.Context) {
-
+		module.Kill()
+		module.queue.Next()
+		module.Start()
 	})
 
 	return module
@@ -63,7 +75,7 @@ func (module *Media) mediaLoop() {
 
 	for len(module.queue.Get()) > 0 {
 		url := module.queue.Get()
-		log.Printf("[Media] playing: %s", url)
+		log.Printf("[Media] Playing: %s", url)
 		module.c1 = exec.Command("youtube-dl", "-o", "-", url)
 		module.c2 = exec.Command("cvlc", "-", "vlc://quit", "-f", "--no-video-title-show")
 		module.c2.Stdin, _ = module.c1.StdoutPipe()
@@ -71,6 +83,8 @@ func (module *Media) mediaLoop() {
 		_ = module.c2.Start()
 		_ = module.c1.Run()
 		_ = module.c2.Wait()
+		module.c1 = nil
+		module.c2 = nil
 
 		// Process exited
 		// Lock is to keep this worker from running until any kill actions are complete
@@ -93,7 +107,6 @@ func (module *Media) Start() error {
 }
 
 func (module *Media) Stop() error {
-	log.Println("[Media] Stopping...")
 	module.queue.Empty()
 	module.Kill()
 	return nil
