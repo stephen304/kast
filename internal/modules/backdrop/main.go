@@ -1,21 +1,14 @@
 package backdrop
 
 import (
+	"context"
+	"github.com/chromedp/chromedp"
 	"github.com/gin-gonic/gin"
 	"github.com/stephen304/kast/internal"
-	// "math/rand"
-	"os/exec"
-	// "regexp"
-	// "strings"
-	"sync"
-	// "time"
-	"context"
-	// "fmt"
-	"github.com/chromedp/chromedp"
 	"log"
+	"os/exec"
+	"sync"
 )
-
-const NAME = "BACKDROP"
 
 type Backdrop struct {
 	m              sync.Mutex
@@ -28,7 +21,8 @@ type Backdrop struct {
 func New(r *gin.RouterGroup, display *internal.DisplayMutex) *Backdrop {
 	module := &Backdrop{}
 
-	display.Assign(module)
+	// TODO It might be better to do this somewhere else
+	go display.Assign(module)
 
 	r.POST("/start", func(c *gin.Context) {
 		display.Assign(module)
@@ -60,10 +54,6 @@ func New(r *gin.RouterGroup, display *internal.DisplayMutex) *Backdrop {
 	})
 
 	return module
-}
-
-func (module *Backdrop) GetName() string {
-	return NAME
 }
 
 func (module *Backdrop) Start() error {
@@ -136,11 +126,10 @@ func (module *Backdrop) Stop() error {
 	module.m.Lock()
 	defer module.m.Unlock()
 
-	var err error = nil
 	if module.taskCtx != nil {
 		module.taskCtxCancel()
 		module.allocCtxCancel()
 		module.taskCtx = nil
 	}
-	return err
+	return nil
 }

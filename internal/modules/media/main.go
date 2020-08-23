@@ -9,14 +9,12 @@ import (
 	"sync"
 )
 
-const NAME = "MEDIA"
-
 type Media struct {
 	queue   *queue
 	c1      *exec.Cmd
 	c2      *exec.Cmd
 	m       sync.Mutex
-	worker       sync.Mutex
+	worker  sync.Mutex
 	running bool
 }
 
@@ -63,10 +61,6 @@ func New(r *gin.RouterGroup, display *internal.DisplayMutex) *Media {
 	})
 
 	return module
-}
-
-func (module *Media) GetName() string {
-	return NAME
 }
 
 func (module *Media) mediaLoop() {

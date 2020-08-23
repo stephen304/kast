@@ -1,7 +1,6 @@
 package media
 
 import (
-	"log"
 	"sync"
 )
 
@@ -48,8 +47,6 @@ func (q *queue) Prev() string {
 		q.playHead = q.prevItems[len(q.prevItems)-1]
 		q.prevItems = q.prevItems[:len(q.prevItems)-1]
 
-	} else {
-		log.Print("Nothing to reqind to")
 	}
 	return q.playHead
 }
