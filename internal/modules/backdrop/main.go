@@ -6,13 +6,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stephen304/kast/internal"
 	"log"
-	"os/exec"
 	"sync"
 )
 
 type Backdrop struct {
 	m              sync.Mutex
-	cmd            *exec.Cmd
 	allocCtxCancel context.CancelFunc
 	taskCtx        context.Context
 	taskCtxCancel  context.CancelFunc
@@ -97,6 +95,7 @@ func (module *Backdrop) Start() error {
 		// No UI is best UI
 		chromedp.Flag("kiosk", true),
 		chromedp.Flag("force-dark-mode", true),
+		// chromedp.Flag("enable-features", "WebUIDarkMode"),
 	}
 
 	// Create chrome process

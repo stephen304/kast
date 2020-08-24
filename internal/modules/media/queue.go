@@ -46,7 +46,6 @@ func (q *queue) Prev() string {
 
 		q.playHead = q.prevItems[len(q.prevItems)-1]
 		q.prevItems = q.prevItems[:len(q.prevItems)-1]
-
 	}
 	return q.playHead
 }

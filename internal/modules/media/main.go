@@ -10,26 +10,31 @@ import (
 )
 
 type Media struct {
-	queue   *queue
-	c1      *exec.Cmd
-	c2      *exec.Cmd
-	m       sync.Mutex
-	worker  sync.Mutex
-	running bool
+	queue  *queue
+	c1     *exec.Cmd
+	c2     *exec.Cmd
+	m      sync.Mutex
+	worker sync.Mutex
 }
 
 func New(r *gin.RouterGroup, display *internal.DisplayMutex) *Media {
 	module := &Media{
-		queue:   newQueue(),
-		running: false,
+		queue: newQueue(),
 	}
+
+	r.GET("/status", func(c *gin.Context) {
+		//
+	})
 
 	// Adds the url to the end of the queue
 	// Also activates the module and starts the process if not active
 	r.POST("/enqueue", func(c *gin.Context) {
 		url := c.PostForm("url")
 		module.queue.enqueue(url)
-		display.Assign(module)
+
+		if !display.Assign(module) {
+			module.Start()
+		}
 	})
 
 	// Immediately plays the selected media followed by nextItems in the queue
@@ -64,8 +69,8 @@ func New(r *gin.RouterGroup, display *internal.DisplayMutex) *Media {
 }
 
 func (module *Media) mediaLoop() {
+	// Worker lock lets kill process flush out the worker
 	module.worker.Lock()
-	defer module.worker.Unlock()
 
 	for len(module.queue.Get()) > 0 {
 		url := module.queue.Get()
@@ -74,29 +79,39 @@ func (module *Media) mediaLoop() {
 		module.c2 = exec.Command("cvlc", "-", "vlc://quit", "-f", "--no-video-title-show")
 		module.c2.Stdin, _ = module.c1.StdoutPipe()
 		module.c2.Stdout = os.Stdout // What's this for
+		// Run both threads concurrently
 		_ = module.c2.Start()
-		_ = module.c1.Run()
+		_ = module.c1.Start()
+		// Wait for VLC to finish or be killed
 		_ = module.c2.Wait()
-		module.c1 = nil
-		module.c2 = nil
 
 		// Process exited
-		// Lock is to keep this worker from running until any kill actions are complete
+		// Lock while checking process values
 		module.m.Lock()
-		if module.running == false {
-			// Processes were killed
-			module.m.Unlock()
+		dead := module.c1 == nil || module.c2 == nil
+		module.m.Unlock()
+		if dead {
+			// Processes were killed, don't touch the queue and just exit
+			module.worker.Unlock()
 			return
 		}
 		module.queue.Next()
-		module.m.Unlock()
 	}
-	module.Stop()
+	// Worker must be unlocked before kill because kill always
+	//   waits on the worker lock to ensure thread safety for callers of Kill
+	module.worker.Unlock()
+	// Kill the process but don't empty the queue
+	module.Kill()
 }
 
 func (module *Media) Start() error {
-	module.running = true
-	go module.mediaLoop()
+	module.m.Lock()
+	defer module.m.Unlock()
+
+	if module.c1 == nil && module.c2 == nil {
+		go module.mediaLoop()
+	}
+
 	return nil
 }
 
@@ -112,12 +127,13 @@ func (module *Media) Kill() {
 	if module.c1 != nil && module.c1.Process != nil {
 		module.c1.Process.Kill()
 	}
+	module.c1 = nil // To ensure it will be restarted later
 	if module.c2 != nil && module.c2.Process != nil {
 		module.c2.Process.Kill()
 	}
-	module.running = false
+	module.c2 = nil
+
 	module.m.Unlock()
-	// Ensure all workers have exited
 	module.worker.Lock()
 	module.worker.Unlock()
 }

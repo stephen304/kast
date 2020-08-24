@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"syscall"
 	"time"
@@ -19,11 +20,15 @@ func main() {
 	r := gin.Default()
 	display := internal.NewDisplayMutex()
 
-	media := media.New(r.Group("/media"), display)
 	backdrop := backdrop.New(r.Group("/backdrop"), display)
+	media := media.New(r.Group("/media"), display)
 
 	r.POST("/stop", func(c *gin.Context) {
 		display.Assign(backdrop)
+	})
+
+	r.POST("/reboot", func(c *gin.Context) {
+		exec.Command("reboot").Run()
 	})
 
 	// listen and serve on 0.0.0.0:8080 (for windows "localhost:8080")
@@ -60,6 +65,6 @@ func main() {
 
 	log.Println("API closed")
 	log.Println("Shutting down modules...")
-	media.Stop()
 	backdrop.Stop()
+	media.Stop()
 }

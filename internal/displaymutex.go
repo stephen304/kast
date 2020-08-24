@@ -24,7 +24,9 @@ func NewDisplayMutex() *DisplayMutex {
 	return &DisplayMutex{}
 }
 
-func (mutex *DisplayMutex) Assign(module KastModule) {
+// Returns true if the module is different and Start was called
+// On false, the module was already loaded and no action was taken
+func (mutex *DisplayMutex) Assign(module KastModule) bool {
 	mutex.m.Lock()
 	defer mutex.m.Unlock()
 
@@ -37,6 +39,9 @@ func (mutex *DisplayMutex) Assign(module KastModule) {
 		}
 		log.Printf("[%s] Starting...", getModuleName(module))
 		mutex.module = module
-		mutex.module.Start()
+		go mutex.module.Start()
+		return true
+	} else {
+		return false
 	}
 }
