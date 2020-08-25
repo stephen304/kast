@@ -40,6 +40,9 @@ Currently based on Raspbian Lite:
   * Find or set these values:
     * `autologin-user=pi`
     * `autologin-session=bspwm`
+* Clone the repo and go build / download the binary
+* Copy `kast` to `/usr/bin/` and copy the service files to `/etc/systemd/user/`
+* Enable `kast.service` with the `--user` flag
 * Reboot
 
 You can now build and run the binary with `DISPLAY=:0 XDG_RUNTIME_DIR=/run/user/1000 kast`
