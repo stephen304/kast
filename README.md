@@ -24,22 +24,22 @@ In its current implementation, Kast acts as a mediator between multiple processe
 ## Installation
 Currently based on Raspbian Lite:
 
-1. DD raspbian lite to SD card
-1. `touch ssh` in boot if desired
-1. Set passwords (`passwd` and `sudo passwd`)
-1. `raspi-config`
+* DD raspbian lite to SD card
+* `touch ssh` in boot if desired
+* Set passwords (`passwd` and `sudo passwd`)
+* `raspi-config`
   * Set hostname
-1. `ssh-copy-id`
-1. `sudo nano /etc/ssh/sshd_config`
+* `ssh-copy-id`
+* `sudo nano /etc/ssh/sshd_config`
   * `PermitRootLogin no`
   * `PasswordAuthentication no`
-1. Install dependencies: `apt-get update && apt-get upgrade && apt-get install vlc chromium-browser unclutter lightdm bspwm python-pip pulseaudio`
-1. Optional: Install dev dependencies `apt-get install golang git`
-1. Install youtube-dl `sudo pip install --upgrade youtube_dl`
-1. `sudo nano /etc/lightdm/lightdm.conf`
+* Install dependencies: `apt-get update && apt-get upgrade && apt-get install vlc chromium-browser unclutter lightdm bspwm python-pip pulseaudio`
+* Optional: Install dev dependencies `apt-get install golang git`
+* Install youtube-dl `sudo pip install --upgrade youtube_dl`
+* `sudo nano /etc/lightdm/lightdm.conf`
   * Find or set these values:
     * `autologin-user=pi`
     * `autologin-session=bspwm`
-1. Reboot
+* Reboot
 
 You can now build and run the binary with `DISPLAY=:0 XDG_RUNTIME_DIR=/run/user/1000 kast`
