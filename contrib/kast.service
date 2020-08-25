@@ -1,7 +1,7 @@
 [Unit]
 Description=Kast Service
-Wants=display-manager.service
-After=network.target display-manager.service
+Wants=display-manager.service kast-pre.service
+After=network.target display-manager.service kast-pre.service
 
 [Service]
 ExecStart=/usr/bin/kast

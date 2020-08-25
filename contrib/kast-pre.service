@@ -1,0 +1,9 @@
+[Unit]
+Description=Kast Service Precondition
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c 'while [ ! "$(systemctl --user show-environment | grep DISPLAY)" ]; do sleep 0.1; done;'
+
+[Install]
+WantedBy=default.target
