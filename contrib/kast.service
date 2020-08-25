@@ -1,0 +1,12 @@
+[Unit]
+Description=Kast Service
+Wants=display-manager.service
+After=network.target display-manager.service
+
+[Service]
+ExecStart=/usr/bin/kast
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
