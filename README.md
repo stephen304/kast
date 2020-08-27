@@ -46,3 +46,17 @@ Currently based on Raspbian Lite:
 * Reboot
 
 You can now build and run the binary with `DISPLAY=:0 XDG_RUNTIME_DIR=/run/user/1000 kast`
+
+To speed up boot:
+
+https://www.myhelpfulguides.com/2018/10/20/how-improve-raspberry-pi-boot-time-raspbian-lite/s
+https://raspberrypi.stackexchange.com/questions/5256/how-can-i-improve-boot-time-on-raspbian
+
+* Disable services:
+  * `avahi-daemon`
+  * `bluetooth`
+  * `triggerhappy`
+
+* Edit configs
+  * `/boot/config.txt`
+    * `boot_delay=0`

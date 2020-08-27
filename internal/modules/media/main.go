@@ -30,8 +30,19 @@ func New(r *gin.RouterGroup, display *internal.DisplayMutex) *Media {
 	// Also activates the module and starts the process if not active
 	r.POST("/enqueue", func(c *gin.Context) {
 		url := c.PostForm("url")
-		module.queue.enqueue(url)
+		title := url
 
+		// Try to get title
+		titleBytes, err := exec.Command("youtube-dl", "--skip-download", "--get-title", "--no-warnings", url).Output()
+		if (err == nil) {
+			title = string(titleBytes)
+		}
+
+		// Add media to queue
+		module.queue.enqueue(url, title)
+
+		// Assign module, if it was already assigned, run start to kick off a vlc
+		//   thread if vlc is not running
 		if !display.Assign(module) {
 			module.Start()
 		}
@@ -72,11 +83,11 @@ func (module *Media) mediaLoop() {
 	// Worker lock lets kill process flush out the worker
 	module.worker.Lock()
 
-	for len(module.queue.Get()) > 0 {
-		url := module.queue.Get()
+	for len(module.queue.GetUrl()) > 0 {
+		url, title := module.queue.Get()
 		log.Printf("[Media] Playing: %s", url)
 		module.c1 = exec.Command("youtube-dl", "-o", "-", url)
-		module.c2 = exec.Command("cvlc", "-", "vlc://quit", "-f", "--no-video-title-show")
+		module.c2 = exec.Command("cvlc", "-", "vlc://quit", "-f", "--meta-title", title)
 		module.c2.Stdin, _ = module.c1.StdoutPipe()
 		module.c2.Stdout = os.Stdout // What's this for
 		// Run both threads concurrently
